@@ -14,18 +14,17 @@ object RMIServer extends sbt.Plugin {
   val rmiSettings = Seq(
      rmiPort := 8081,
      rmiPath := "/target/scala-2.10/",
-     rmiStart := { 
-import scala.sys.process._
-        ("rmiregistry " + rmiPort.value).!!
-	println("despertando a rmi!" )
-     },
-     rmiStop := { 
-import scala.sys.process._
+     rmiStart := {
+       println("despertando a rmi!" )
+      sys.process.Process(Seq("rmiregistry", rmiPort.value.toString ), new java.io.File("/home/zoek/workspace/scala/sbt-rmi/target/scala-2.10/sbt-0.13/classes/sbtrmi")).!
+    },
+     rmiStop := {
+         import scala.sys.process._
         "killall rmiregistry".!!
-	println("matando a todos los rmi >.<!")
+	       println("matando a todos los rmi >.<!")
      }
   )
-  
+
   override lazy val settings = rmiSettings ++ Seq(commands += rmiServer)
 
   lazy val rmiServer = Command.command("rmiServer") { (state: State) =>
@@ -33,18 +32,23 @@ import scala.sys.process._
     import extracted._
 
     //val rmiStartKey = Keys.rmiStop
-
-    val result: Option[Result[Unit]] = Project.evaluateTask(rmiStart, state)
-    // handle the result
-    result match {
-        case None => println("key no fue definida")// Key wasn't defined.
-        case Some(Inc(inc)) => println("hacer algo con " + inc)
-        case Some(Value(v)) => println("todo ok")// do something with v: inc.Analysis
+    val thread = new Thread {
+      override def run {
+        val result: Option[Result[Unit]] = Project.evaluateTask(rmiStart, state)
+       // handle the result
+       result match {
+          case None => println("key no fue definida")// Key wasn't defined.
+          case Some(Inc(inc)) => println("hacer algo con " + inc)
+          case Some(Value(v)) => println("todo ok")// do something with v: inc.Analysis
+       }
+      }
     }
+
+    thread.start
 
     // get name of current project
     val nameOpt: Option[String] = name in currentRef get structure.data
-    
+
     println("wake up! " + nameOpt)
     state
   }
