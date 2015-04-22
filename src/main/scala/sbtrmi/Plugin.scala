@@ -12,14 +12,32 @@ object RMIServer extends sbt.Plugin {
   val rmiStop = taskKey[Unit]("stop the rmi server")
   val rmiCompile = taskKey[Unit]("Compile with rmic")
 
+  // Move this to utils
+  def getPathFor(target: String): Option[File]  = {
+    val localFile = file(s"./target/") ** s"$target.class"
+
+    if (localFile.get.length == 1 ) {
+      var tmp = file((localFile.get)(0).getParent)
+      Some(tmp)
+    }
+    else None
+  }
 
   val rmiSettings = Seq(
      rmiPort := 8081,
+     // TODO: Remove this option, is more easy using the discovery facilities of File
+     // REF-1: http://www.scala-sbt.org/0.12.4/docs/Detailed-Topics/Paths.html
      rmiPath := "/target/scala-2.10/",
      rmiClass := "Server",
      rmiStart := {
        println("despertando a rmi!" )
-      sys.process.Process(Seq("rmiregistry", rmiPort.value.toString ), new java.io.File("/home/zoek/workspace/scala/sbt-rmi/target/scala-2.10/sbt-0.13/classes/sbtrmi")).!
+       // TODO: adds validation to the class
+       getPathFor(rmiClass.value) match {
+         case Some(path) => sys.process.Process(Seq("rmiregistry", rmiPort.value.toString ), path).!
+         case None => println("Clase no encontrada")
+         
+       }
+       Unit
     },
      rmiStop := {
          import scala.sys.process._
@@ -27,10 +45,15 @@ object RMIServer extends sbt.Plugin {
 	       println("matando a todos los rmi >.<!")
      },
      rmiCompile := {
-       val scalaVer = "scala-" + scalaVersion.value.toString.replaceAll("\\.\\d+$", "")
-       val sbtVer = "sbt-" + sbtVersion.value.toString.replaceAll("\\.\\d+$", "")
-       val classes = file(s"./target/${scalaVer}/${sbtVer}") ** "*.class"
-       sys.process.Process(Seq("rmic", rmiClass.value.toString  + ".class"), new java.io.File(s"./target/${scalaVer}/${sbtVer}/classes/sbtrmi")).!
+       // Delete this. See REF-1
+       // val scalaVer = "scala-" + scalaVersion.value.toString.replaceAll("\\.\\d+$", "")
+       // val sbtVer = "sbt-" + sbtVersion.value.toString.replaceAll("\\.\\d+$", "")
+       // val classes = file(s"./target/${scalaVer}/${sbtVer}") ** "*.class"
+       getPathFor(rmiClass.value) match {
+        case Some(path) => sys.process.Process(Seq("rmic", rmiClass.value.toString  + ".class"), path).!
+        case None => println("Clase no encontrada")
+       }
+       Unit
      }
   )
 
