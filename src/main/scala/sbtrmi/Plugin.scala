@@ -12,6 +12,9 @@ object RMIServer extends sbt.Plugin {
   val rmiStop = taskKey[Unit]("stop the rmi server")
   val rmiCompile = taskKey[Unit]("Compile with rmic")
 
+
+  rmiCompile <<=  Seq(compile in Compile).dependOn
+
   // Move this to utils
   def getPathFor(target: String): Option[File]  = {
     val localFile = file(s"./target/") ** s"$target.class"
@@ -35,7 +38,7 @@ object RMIServer extends sbt.Plugin {
        getPathFor(rmiClass.value) match {
          case Some(path) => sys.process.Process(Seq("rmiregistry", rmiPort.value.toString ), path).!
          case None => println("Clase no encontrada")
-         
+
        }
        Unit
     },
@@ -45,12 +48,14 @@ object RMIServer extends sbt.Plugin {
 	       println("matando a todos los rmi >.<!")
      },
      rmiCompile := {
+       val cp = (fullClasspath in Runtime).value.files.map((a) => a.toString).reduce((a: String, b:String ) => s"$a:$b")
+
        // Delete this. See REF-1
        // val scalaVer = "scala-" + scalaVersion.value.toString.replaceAll("\\.\\d+$", "")
        // val sbtVer = "sbt-" + sbtVersion.value.toString.replaceAll("\\.\\d+$", "")
        // val classes = file(s"./target/${scalaVer}/${sbtVer}") ** "*.class"
        getPathFor(rmiClass.value) match {
-        case Some(path) => sys.process.Process(Seq("rmic", rmiClass.value.toString  + ".class"), path).!
+        case Some(path) => sys.process.Process(Seq("rmic", "-classpath", cp, rmiClass.value.toString), path).!
         case None => println("Clase no encontrada")
        }
        Unit
