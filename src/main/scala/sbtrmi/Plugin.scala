@@ -2,6 +2,7 @@ package sbtrmi
 
 import sbt._
 import Keys._
+import complete.DefaultParsers._
 
 
 object RMIServer extends sbt.Plugin {
@@ -10,10 +11,10 @@ object RMIServer extends sbt.Plugin {
   val rmiClass = settingKey[String]("Classes to compile with rmiserver")
   val rmiStart = taskKey[Unit]("really wake up the rmi server")
   val rmiStop = taskKey[Unit]("stop the rmi server")
-  val rmiCompile = taskKey[Unit]("Compile with rmic")
+  val rmiCompile = inputKey[Unit]("Compile with rmic")
 
 
-  rmiCompile <<=  Seq(compile in Compile).dependOn
+  (compile in Compile) <<=  (compile in Compile).dependsOn(rmiCompile.toTask(""))
 
   // Move this to utils
   def getPathFor(target: String): Option[File]  = {
@@ -50,13 +51,25 @@ object RMIServer extends sbt.Plugin {
      rmiCompile := {
        val cp = (fullClasspath in Runtime).value.files.map((a) => a.toString).reduce((a: String, b:String ) => s"$a:$b")
 
+       val args: Seq[String] = spaceDelimited("<arg>").parsed
+       var _classes: Seq[String] = Seq("")
+       if (args.length >= 1)
+         _classes = args
+       else
+         rmiClass.value match { 
+            case sing: String => _classes = (rmiClass.value).split("\\s+")
+            case seq: Seq[String] => _classes = seq
+         }
+
        // Delete this. See REF-1
        // val scalaVer = "scala-" + scalaVersion.value.toString.replaceAll("\\.\\d+$", "")
        // val sbtVer = "sbt-" + sbtVersion.value.toString.replaceAll("\\.\\d+$", "")
        // val classes = file(s"./target/${scalaVer}/${sbtVer}") ** "*.class"
-       getPathFor(rmiClass.value) match {
-        case Some(path) => sys.process.Process(Seq("rmic", "-classpath", cp, rmiClass.value.toString), path).!
-        case None => println("Clase no encontrada")
+       for (_class <- _classes) {
+         getPathFor(_class) match {
+           case Some(path) => sys.process.Process(Seq("rmic", "-classpath", cp, rmiClass.value.toString), path).!
+           case None => println(s"Clase no encontrada ${_class}")
+         }
        }
        Unit
      }
